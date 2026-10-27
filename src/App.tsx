@@ -6,17 +6,20 @@ import { useAuth } from './hooks/useAuth';
 import { UserDataProvider, useUserData } from './hooks/UserData';
 import { GearContext } from './hooks/Gear';
 import { computeScores } from './lib/scoring';
+import { computeReadiness } from './lib/readiness';
 import { WIKI } from './lib/wiki';
 import { ItemDrawer } from './components/ItemDrawer';
 import { Rankings } from './views/Rankings';
 import { ContentView } from './views/ContentView';
 import { MyGear } from './views/MyGear';
 import { Settings } from './views/Settings';
+import { Prayers } from './views/Prayers';
 import type { GearData } from './types';
 
 const NAV = [
   ['rankings', 'Rankings'],
   ['content', 'Bosses & Slayer'],
+  ['prayers', 'Prayers'],
   ['mine', 'My gear'],
   ['settings', 'Settings'],
 ] as const;
@@ -43,7 +46,8 @@ function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth
 
   const scores = useMemo(() => computeScores(data, user.weights), [data, user.weights]);
   const contentById = useMemo(() => new Map(data.content.map(c => [c.id, c])), [data]);
-  const ctx = { data, scores, contentById, price, openItem: setOpenName };
+  const readiness = useMemo(() => computeReadiness(data, user.owned, user.levels), [data, user.owned, user.levels]);
+  const ctx = { data, scores, contentById, readiness, price, openItem: setOpenName };
 
   return (
     <GearContext.Provider value={ctx}>
@@ -70,6 +74,7 @@ function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth
       <main>
         {view === 'content' ? <ContentView id={params[0]} setupIndex={Number(params[1] ?? 0)} />
           : view === 'mine' ? <MyGear />
+          : view === 'prayers' ? <Prayers />
           : view === 'settings' ? <Settings />
           : <Rankings />}
       </main>

@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { imageUrl, capitalize } from '../lib/wiki';
+import { imageUrl, capitalize, pageUrl } from '../lib/wiki';
 import { checkReqs } from '../lib/scoring';
+import { READINESS_LABEL, type Readiness } from '../lib/readiness';
 import { useUserData } from '../hooks/UserData';
 import { useGear } from '../hooks/Gear';
-import type { Item, Skill } from '../types';
+import type { Item, Skill, Source } from '../types';
 
 const SKILL_ABBR: Record<Skill, string> = {
   attack: 'Att', strength: 'Str', defence: 'Def', ranged: 'Rng',
@@ -44,13 +45,42 @@ export function OwnWant({ name }: { name: string }) {
   );
 }
 
-/** Shows a lock with the missing levels if the player can't equip the item yet. */
-export function LockBadge({ item }: { item: Item }) {
+/** Shows a lock with the missing levels if the player can't equip the item (or use the prayer) yet. */
+export function LockBadge({ item }: { item: Pick<Item, 'reqs'> }) {
   const { data } = useUserData();
   const check = checkReqs(item, data.levels);
   if (check.ok) return null;
   const text = check.missing.map(m => `${m.need} ${capitalize(m.skill)} (you: ${m.have})`).join(', ');
   return <span className="lock" title={`Requires ${text}`}>🔒 {check.missing.map(m => `${m.need} ${SKILL_ABBR[m.skill]}`).join(' · ')}</span>;
+}
+
+export function ReadinessBadge({ level }: { level: Readiness }) {
+  return <span className={`ready r-${level}`}>{READINESS_LABEL[level]}</span>;
+}
+
+/** Where to get an item: each source with its drop rate and, for content we track, how ready the player is. */
+export function SourceList({ sources }: { sources: Source[] }) {
+  const { readiness } = useGear();
+  if (!sources.length) return <p className="muted small">No drop or reward sources found on the wiki.</p>;
+  return (
+    <ul className="sources">
+      {sources.map(s => {
+        const r = s.contentId ? readiness.get(s.contentId) : undefined;
+        return (
+          <li key={s.from}>
+            {s.contentId
+              ? <a href={`#/content/${s.contentId}`}>{s.from}</a>
+              : <a href={pageUrl(s.page)} target="_blank" rel="noopener">{s.from} ↗</a>}
+            {s.via && <span className="muted small">({s.via})</span>}
+            {s.kind !== 'drop' && <span className="muted small">{s.kind}</span>}
+            <span className="grow" />
+            {r && <ReadinessBadge level={r.level} />}
+            <span className="rate">{s.rate ?? '—'}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export function ItemName({ item, showSlot }: { item: Item; showSlot?: boolean }) {

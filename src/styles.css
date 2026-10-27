@@ -123,6 +123,33 @@ tbody tr:hover { background: var(--panel-2); }
 .weights label { display: grid; grid-template-columns: 100px 1fr 40px; align-items: center; gap: 10px; }
 .weights input { padding: 0; }
 
+/* Readiness */
+.ready { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; color: #fff; background: var(--muted); }
+.r-overgeared { --r: #7a5aa8; } .r-well { --r: var(--own); } .r-ready { --r: #3b82c4; } .r-under { --r: var(--want); } .r-not { --r: var(--muted); }
+.ready[class*="r-"] { background: var(--r); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--r, var(--muted)); vertical-align: middle; }
+.readiness-card { margin-bottom: 12px; border-left: 4px solid var(--r, var(--line)); }
+.readiness-card p { margin: 6px 0 0; }
+.lock-text { color: var(--danger); font-size: 13px; }
+.ready-group { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; }
+.ready-list { font-size: 13px; }
+.farm { display: block; font-size: 11px; color: var(--own); margin: 2px 0 0 42px; }
+
+/* Sources */
+.sources { list-style: none; padding: 0; margin: 0 0 14px; }
+.sources li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+.rate { font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+
+/* Prayers */
+.prayer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.prayer p { margin: 8px 0; }
+.prayer-head { display: flex; gap: 10px; align-items: flex-start; }
+.prayer-head h3 { margin: 0 0 2px; }
+.prayer .lock { margin: 6px 0 0; }
+.prayer details { margin-top: 6px; }
+.prayer summary { cursor: pointer; }
+.prayer summary .icon { vertical-align: middle; }
+
 .hide-sm { }
 @media (max-width: 720px) {
   .hide-sm { display: none; }
@@ -134,5 +161,6 @@ tbody tr:hover { background: var(--panel-2); }
   th, td { padding: 8px 6px; }
   .toolbar input[type=search] { min-width: 0; flex: 1; }
   .levels { grid-template-columns: repeat(2, 1fr); }
-  .lock { margin-left: 0; }
+  .lock, .farm { margin-left: 0; }
+  .prayer-grid { grid-template-columns: 1fr; }
 }

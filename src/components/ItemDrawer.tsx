@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useGear } from '../hooks/Gear';
 import { capitalize, formatGp, pageUrl } from '../lib/wiki';
-import { ItemIcon, LockBadge, OwnWant, StyleBadge } from './ui';
+import { ItemIcon, LockBadge, OwnWant, SourceList, StyleBadge } from './ui';
 
 const CATEGORY_LABEL: Record<string, string> = { boss: 'Boss', raid: 'Raid', slayer: 'Slayer', wilderness: 'Wildy', minigame: 'Minigame' };
 
@@ -13,7 +13,8 @@ export function ItemDrawer({ name, onClose }: { name: string | null; onClose: ()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
+    addEventListener('hashchange', onClose);  // following a link out of the drawer
+    return () => { removeEventListener('keydown', onKey); removeEventListener('hashchange', onClose); };
   }, [onClose]);
 
   return (
@@ -49,11 +50,14 @@ export function ItemDrawer({ name, onClose }: { name: string | null; onClose: ()
                 <LockBadge item={item} />
               </div>
             )}
+            <h3>How to get it</h3>
+            {item.tradeable && <p className="small">Buy on the Grand Exchange for <b>{formatGp(price(item.geId))}</b>, or:</p>}
+            <SourceList sources={item.sources} />
             <h3>Recommended at {s?.uses ?? 0} places</h3>
             <ul className="used">
               {s?.usedAt.map(({ content, tier }) => (
                 <li key={content.id}>
-                  <a href={`#/content/${content.id}`} onClick={onClose}>{content.name}</a>
+                  <a href={`#/content/${content.id}`}>{content.name}</a>
                   <span className="muted small">{CATEGORY_LABEL[content.category]}</span>
                   <span className={`tier-tag t${tier}`}>Tier {tier}</span>
                 </li>

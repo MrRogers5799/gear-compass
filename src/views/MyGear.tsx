@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
 import { checkReqs, type Scored } from '../lib/scoring';
-import { formatGp } from '../lib/wiki';
-import { ItemName, LockBadge, OwnWant } from '../components/ui';
+import { farmableSource, READINESS } from '../lib/readiness';
+import { formatGp, imageUrl } from '../lib/wiki';
+import { ItemName, LockBadge, OwnWant, ReadinessBadge } from '../components/ui';
 import type { Item } from '../types';
 
 /** Only suggest items recommended in a reasonable number of places, so one-boss niche gear doesn't dominate. */
@@ -12,10 +13,10 @@ const MIN_USES = 3;
 const ownedKey = (item: Item) => `${item.slot}:${item.style === 'mixed' ? 'all' : item.style}`;
 
 export function MyGear() {
-  const { data, scores, price } = useGear();
+  const { data, scores, price, readiness, contentById } = useGear();
   const { data: user } = useUserData();
 
-  const { buys, unlocks, bestOwned } = useMemo(() => {
+  const { buys, unlocks, farms, bestOwned } = useMemo(() => {
     // Best owned score per slot+style, so a whip doesn't make every ranged weapon look like a downgrade.
     const bestOwned = new Map<string, number>();
     for (const n of user.owned) {
@@ -43,8 +44,22 @@ export function MyGear() {
       .filter(c => !c.s.item.tradeable)
       .sort((a, b) => b.gain - a.gain)
       .slice(0, 10);
-    return { buys, unlocks, bestOwned };
-  }, [scores, user.owned, user.levels, user.budget, price]);
+    // Upgrades that drop from content the player is already geared for.
+    const farms = candidates
+      .map(c => ({ ...c, src: farmableSource(c.s.item, readiness) }))
+      .filter(c => c.src)
+      .sort((a, b) => b.gain - a.gain)
+      .slice(0, 8);
+    return { buys, unlocks, farms, bestOwned };
+  }, [scores, user.owned, user.levels, user.budget, price, readiness]);
+
+  const readyGroups = READINESS.filter(l => l !== 'not' && l !== 'under')
+    .map(level => ({ level, list: [...readiness.values()].filter(r => r.level === level).map(r => r.content) }))
+    .filter(g => g.list.length);
+  const prayersToUnlock = data.prayers
+    .filter(p => p.unlock && !user.prayers.includes(p.name))
+    .sort((a, b) => b.usedAt.length - a.usedAt.length)
+    .slice(0, 4);
 
   const wanted = user.wanted.map(n => data.items[n]).filter(Boolean);
   const wishlistCost = wanted.reduce((sum, i) => sum + (price(i.geId) ?? 0), 0);
@@ -62,6 +77,21 @@ export function MyGear() {
   return (
     <section className="grid2">
       <div className="card pad">
+        <h3>Farm next</h3>
+        <p className="muted small">Upgrades that drop from bosses, raids or Slayer tasks you're already geared for.</p>
+        <ul className="list">
+          {farms.map(({ s, gain, src }) => (
+            <Line key={s.item.name} s={s} extra={
+              <span className="muted small">
+                +{gain} · <a href={`#/content/${src!.contentId}`}>{contentById.get(src!.contentId!)?.name ?? src!.from}</a>
+                {' '}{src!.rate ?? ''}{src!.via && ` (${src!.via})`}
+              </span>
+            } />
+          ))}
+          {!farms.length && <li className="muted">
+            {user.owned.length ? 'Nothing yet. Upgrades from content you\'re ready for will show here.' : 'Mark the gear you own to see what you can farm.'}
+          </li>}
+        </ul>
         <h3>Best value buys</h3>
         <p className="muted small">
           The biggest tradeable upgrades over what you own (for the same slot and combat style) that you can equip and afford.
@@ -82,7 +112,32 @@ export function MyGear() {
       </div>
 
       <div className="card pad">
-        <h3>Wishlist {wanted.length > 0 && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
+        <h3>Where you're ready</h3>
+        {readyGroups.map(g => (
+          <div key={g.level} className="ready-group">
+            <ReadinessBadge level={g.level} />
+            <span className="ready-list">
+              {g.list.map((c, i) => <span key={c.id}>{i > 0 && ', '}<a href={`#/content/${c.id}`}>{c.name}</a></span>)}
+            </span>
+          </div>
+        ))}
+        {!readyGroups.length && <p className="muted small">Nothing yet. Mark the gear you own and this fills in.</p>}
+
+        {prayersToUnlock.length > 0 && <>
+          <h3 style={{ marginTop: 18 }}>Prayers to unlock</h3>
+          <ul className="list">
+            {prayersToUnlock.map(p => (
+              <li key={p.name}>
+                <a className="item-name" href="#/prayers"><img className="icon" src={imageUrl(p.image)} alt="" width={24} height={24} />{p.name}</a>
+                <LockBadge item={p} />
+                <span className="grow" />
+                <span className="muted small">used at {p.usedAt.length}</span>
+              </li>
+            ))}
+          </ul>
+        </>}
+
+        <h3 style={{ marginTop: 18 }}>Wishlist {wanted.length > 0 && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
         <ul className="list">
           {wanted.map(i => {
             const s = scores.get(i.name);

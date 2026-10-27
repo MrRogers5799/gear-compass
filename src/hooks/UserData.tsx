@@ -7,6 +7,8 @@ import type { Skill } from '../types';
 export interface UserData {
   owned: string[];
   wanted: string[];
+  /** Prayers the player has unlocked (scroll read / quest done) */
+  prayers: string[];
   rsn: string;
   levels: Partial<Record<Skill, number>>;
   weights: Weights;
@@ -16,7 +18,7 @@ export interface UserData {
   hideLocked: boolean;
 }
 
-const EMPTY: UserData = { owned: [], wanted: [], rsn: '', levels: {}, weights: DEFAULT_WEIGHTS, budget: null, hideLocked: false };
+const EMPTY: UserData = { owned: [], wanted: [], prayers: [], rsn: '', levels: {}, weights: DEFAULT_WEIGHTS, budget: null, hideLocked: false };
 const LOCAL_KEY = 'gear-compass:v1';
 
 function loadLocal(): UserData {
@@ -32,7 +34,7 @@ type SyncState = 'local' | 'loading' | 'synced' | 'saving' | 'error';
 interface Ctx {
   data: UserData;
   update: (patch: Partial<UserData> | ((d: UserData) => Partial<UserData>)) => void;
-  toggle: (list: 'owned' | 'wanted', name: string) => void;
+  toggle: (list: 'owned' | 'wanted' | 'prayers', name: string) => void;
   sync: SyncState;
 }
 

@@ -31,6 +31,44 @@ export interface Content {
   page: string;
   /** All recommended-equipment tables for this content (raid rooms, CM, styles...) */
   setups: Setup[];
+  /** Slayer level needed to fight it (slayer monsters and slayer bosses), if any */
+  slayerLevel: number | null;
+  /** Quests needed to access it (curated for the main bosses), empty if none/unknown */
+  quests: string[];
+}
+
+/** Where an item (or prayer scroll) comes from. */
+export interface Source {
+  /** Monster/boss/activity name as the wiki writes it, e.g. "Abyssal demon", "Unsired", "Barbarian Assault" */
+  from: string;
+  /** Wiki page to link to for `from` */
+  page: string;
+  /** Drop rate as the wiki writes it, e.g. "1/512"; null if not a random drop (shop, minigame points...) */
+  rate: string | null;
+  /** 'drop' = monster drop table, 'reward' = chest/reward table (raids, Barrows...), 'other' = shop/points/quest */
+  kind: 'drop' | 'reward' | 'other';
+  /** Matching Content.id when the source is one of our included bosses/raids/slayer tasks */
+  contentId: string | null;
+  /** For crafted items: the component that actually drops (e.g. "Ultor vestige" for Ultor ring) */
+  via: string | null;
+}
+
+export interface Prayer {
+  name: string;
+  /** Wiki file name of the prayer icon, e.g. "Rigour.png" */
+  image: string;
+  /** All skill levels required, e.g. { prayer: 74, defence: 70 } */
+  reqs: Partial<Record<Skill, number>>;
+  /** Combat style it boosts ('all' for protection prayers etc.) */
+  style: Style | 'all';
+  /** Short effect text from the wiki infobox */
+  effect: string;
+  /** How it's unlocked, one sentence, e.g. "Read a Dexterous prayer scroll (Chambers of Xeric reward)." ; null if available by level alone */
+  unlock: string | null;
+  /** The tradeable/droppable item that unlocks it, if any */
+  scroll: { name: string; image: string; geId: number | null; sources: Source[] } | null;
+  /** Content ids whose strategy pages recommend/mention this prayer */
+  usedAt: string[];
 }
 
 export interface Item {
@@ -54,6 +92,8 @@ export interface Item {
   quests: string[];
   /** Content id -> best tier the item reaches there (1 = best-in-slot ... 5) */
   best: Record<string, number>;
+  /** Where to get it, most likely source first; empty if unknown */
+  sources: Source[];
 }
 
 export interface GearData {
@@ -61,4 +101,5 @@ export interface GearData {
   generated: string;
   content: Content[];
   items: Record<string, Item>;
+  prayers: Prayer[];
 }

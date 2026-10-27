@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
 import { checkReqs } from '../lib/scoring';
+import { farmableSource } from '../lib/readiness';
 import { formatGp } from '../lib/wiki';
 import { Chips, ItemName, LockBadge, OwnWant, StyleBadge } from '../components/ui';
 import type { Slot } from '../types';
@@ -10,12 +11,13 @@ const STYLES = ['all', 'melee', 'ranged', 'magic'] as const;
 const SLOTS = ['all', 'weapon', 'head', 'body', 'legs', 'shield', 'cape', 'neck', 'ammo', 'hands', 'feet', 'ring', 'special'] as const;
 
 export function Rankings() {
-  const { scores, price } = useGear();
+  const { scores, price, readiness, contentById } = useGear();
   const { data: user, update } = useUserData();
   const [style, setStyle] = useState<(typeof STYLES)[number]>('all');
   const [slot, setSlot] = useState<(typeof SLOTS)[number]>('weapon');
   const [q, setQ] = useState('');
   const [inBudget, setInBudget] = useState(false);
+  const [farmable, setFarmable] = useState(false);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -29,9 +31,11 @@ export function Rankings() {
         const p = price(s.item.geId);
         return p == null || p <= user.budget;
       })
+      .map(s => ({ ...s, farm: farmableSource(s.item, readiness) }))
+      .filter(s => !farmable || s.farm)
       .sort((a, b) => b.score - a.score || b.uses - a.uses)
       .slice(0, 100);
-  }, [scores, slot, style, q, user.hideLocked, user.levels, user.budget, inBudget, price]);
+  }, [scores, slot, style, q, user.hideLocked, user.levels, user.budget, inBudget, farmable, price, readiness]);
 
   return (
     <section>
@@ -52,6 +56,10 @@ export function Rankings() {
           <input type="checkbox" checked={inBudget} disabled={user.budget == null} onChange={e => setInBudget(e.target.checked)} />
           Within budget{user.budget != null && ` (${formatGp(user.budget)})`}
         </label>
+        <label className="check" title="Drops from a boss, raid or Slayer task you're at least Ready for">
+          <input type="checkbox" checked={farmable} onChange={e => setFarmable(e.target.checked)} />
+          Farmable now
+        </label>
       </div>
       <div className="card table-wrap">
         <table>
@@ -67,7 +75,15 @@ export function Rankings() {
             {rows.map((s, i) => (
               <tr key={s.item.name}>
                 <td className="muted">{i + 1}</td>
-                <td><ItemName item={s.item} showSlot={slot === 'all'} /><LockBadge item={s.item} /></td>
+                <td>
+                  <ItemName item={s.item} showSlot={slot === 'all'} />
+                  <LockBadge item={s.item} />
+                  {s.farm && (
+                    <span className="farm" title="You're geared for this. Click the item for all sources.">
+                      🎯 {contentById.get(s.farm.contentId!)?.name ?? s.farm.from} · {s.farm.rate ?? '?'}{s.farm.via && ` (${s.farm.via})`}
+                    </span>
+                  )}
+                </td>
                 <td className="hide-sm"><StyleBadge style={s.item.style} /></td>
                 <td><div className="score"><div className="bar"><i style={{ width: `${s.score}%` }} /></div><b>{s.score}</b></div></td>
                 <td className="num hide-sm">{s.bis}</td>

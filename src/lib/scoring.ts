@@ -53,7 +53,7 @@ export interface ReqCheck {
   missing: { skill: Skill; need: number; have: number }[];
 }
 
-export function checkReqs(item: Item, levels: Partial<Record<Skill, number>>): ReqCheck {
+export function checkReqs(item: Pick<Item, 'reqs'>, levels: Partial<Record<Skill, number>>): ReqCheck {
   const missing: ReqCheck['missing'] = [];
   for (const [skill, need] of Object.entries(item.reqs) as [Skill, number][]) {
     const have = levels[skill];

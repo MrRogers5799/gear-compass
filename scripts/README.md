@@ -8,8 +8,8 @@
 python -I scripts/build_data.py [out_path]     # default public/data/gear.json
 ```
 
-A full run takes about 1 minute (about 40 sequential wiki requests, roughly 1s
-apart). Two environment variables help during development:
+A full run takes about 2–3 minutes (about 90 sequential wiki requests, roughly
+1s apart). Two environment variables help during development:
 `GEAR_CACHE=<dir>` caches HTTP responses, and `GEAR_DEBUG=1` prints the items
 where the two requirement sources disagree.
 
@@ -24,6 +24,11 @@ where the two requirement sources disagree.
 | Attack speed, item style | Bucket `infobox_bonuses` |
 | Skill requirements | Wiki item-page lead prose (primary), then [osrsreboxed-db](https://github.com/0xNeffarion/osrsreboxed-db) `items-json-slot` (matched by item id), then the `OVERRIDES` dict |
 | Quest requirements | Lead sentences about wielding or wearing that link a page in Category:Quests or Category:Miniquests, plus `OVERRIDES` |
+| Item sources (`Item.sources`) | Bucket `dropsline` (queried with `bucket.Or` for 50 item names per request, plus each name + " (uncharged)"), Bucket `collection_log_source` (whole bucket, about 1,700 rows, matched by item id), Bucket `recipe` for crafted items, and `EXTRA_SOURCES` |
+| Content Slayer level | Bucket `infobox_monster.slayer_level` (rows with a level above 1), plus `SLAYER_MONSTERS` / `SLAYER_OVERRIDES` |
+| Content quests | The curated `CONTENT_QUESTS` dict (checked against the wiki pages) |
+| Prayers | `{{Infobox Prayer}}` on each prayer page in `PRAYERS` (level, image, effect), with other skill requirements from the lead. Style, unlock sentence and unlock item are curated in `PRAYERS`. The scroll's image and GE id come from `infobox_item` and the price mapping. Its sources work like item sources |
+| Prayer `usedAt` | A case-insensitive regex per prayer (in `PRAYERS`), searched in the wikitext of every strategy page merged into each content |
 
 No Bucket stores equip requirements (`infobox_item.quest` only marks quest
 items). osrsreboxed has been stale since January 2025 and misses the 2025
@@ -43,6 +48,19 @@ At the end of each run the script prints the included content by category,
 every excluded page with its reason, and coverage stats. Check this output
 after the wiki changes.
 
+## How item sources are built
+
+1. Drop rows: `from` is the "Dropped from" value without its `#variant` (for example "Abyssal demon#Wilderness Slayer Cave" becomes "Abyssal demon"), and `page` is the drop page. The kind is `drop` for drop type `combat`, `reward` for `reward` (chests, raids, Barrows, caskets), and `other` for anything else (thieving, hunter...). When `Rolls` is above 1, the rate is shown as "7 × 1/2,448". Rows from the rare and gem drop tables are skipped.
+2. Collection-log rows add sources the drop tables miss. Shops and point stores become `other` with a `null` rate. Collection-log recipe rows are ignored.
+3. Items with neither are traced through Bucket `recipe` (up to 4 levels deep), and take the sources of one key component. The script prefers a component that shares the item's first word (Ultor ring → Ultor icon → Ultor vestige), then any component with at most 10 sources that isn't a commodity (`COMMODITY_RX`: runes, bars, wool...), most valuable first. `KEY_COMPONENTS` fixes chains that are too deep or ambiguous (zenyte jewellery → Zenyte shard, Soulreaper axe → the four DT2 parts).
+4. `EXTRA_SOURCES` adds quest and minigame rewards that the wiki has no table for (Fire cape, Infernal cape, Fighter torso, RFD gloves, Mage Training Arena...).
+5. Sources with the same `from` are merged, keeping the best rate. They are sorted by approximate chance ("Always" first, non-numeric rates last), and at most 8 are kept.
+6. `contentId` is matched in this order: `SOURCE_ALIASES` (Unsired → Abyssal Sire, Dagannoth Rex → Dagannoth Kings, Ancient chest → CoX, Monumental chest → ToB, Dusk → Grotesque Guardians, Eldric/Branda → Royal Titans, GWD bodyguards...), then `SOURCE_PREFIX_ALIASES` ("Revenant …"), then the exact content name, then the singular/plural form ("Abyssal demon" → "Abyssal demons"), then the monster's `infobox_monster.slayer_category` (superiors such as "Greater abyssal demon" or "Nuclear smoke devil" map to their task).
+
+The audit output lists coverage and the most common unmapped sources. With
+`GEAR_DEBUG=1` it also lists the items with no source and the item → component
+choices.
+
 ## Known limitations
 
 - Item names are wiki page names after redirects. Group pages (e.g. "God blessing", "Godsword", "Barrows equipment") stay as single pseudo-items with no GE id or requirements. A section link like `God capes#Imbuing` uses its link text ("Imbued god cape").
@@ -51,3 +69,7 @@ after the wiki changes.
 - Setup style comes from caption keywords, then from the tier-1 weapons' bonuses. Captions like "Tribrid" and "Hybrid" give `mixed`.
 - An empty inner tier array means that tier's cell had no item links (notes only). This keeps tier numbers aligned.
 - New wiki pages fall back to wiki categories. Check the excluded list for new combat content that needs an override.
+- About 15% of items have no source. Most are pseudo-items (Godsword, Arrows, Barrows equipment), skillcapes, achievement-diary rewards and quest rewards that aren't in `EXTRA_SOURCES`. A crafted item's rate is its component's rate.
+- The Slayer level is the level on the matching monster's infobox. A task matched by slayer category takes the lowest level in that category (for example, Custodian stalker 54, the juvenile).
+- `usedAt` is a text match, so it counts mentions, not recommendations. "Protection prayers" alone doesn't count for any protect prayer.
+- "Rite of vile transference" is not a prayer. It's a Yama drop that upgrades the Death Charge spell, so it isn't in `prayers`.
