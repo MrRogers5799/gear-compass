@@ -11,6 +11,8 @@ export interface GearCtx {
   /** How well the player's owned gear fits each content (content id -> readiness) */
   readiness: Map<string, ContentReadiness>;
   price: (geId: number | null) => number | null;
+  /** Ironman account: no GE, gear must be earned */
+  iron: boolean;
   openItem: (name: string) => void;
 }
 

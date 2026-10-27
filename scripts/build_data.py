@@ -1395,7 +1395,11 @@ def main(out_path):
     print(f"Fetching drop sources for {len(items) + len(scrolls)} items...")
     sources, via = build_sources(list(items) + scrolls, ids_of, matcher)
     # Crafted items carry their key component's drops; record which component that is.
-    sources = {n: [{**s, "via": via.get(n)} for s in lst] for n, lst in sources.items()}
+    # Raid chest rates on the wiki are the item's share of unique ("purple") loot, not a per-raid chance.
+    raid_chests = {"Ancient chest", "Monumental chest", "Chest (Tombs of Amascut)"}
+    sources = {n: [{**s, "via": via.get(n),
+                    "rate": f"{s['rate']} of uniques" if s["from"] in raid_chests and s["rate"] else s["rate"]}
+                   for s in lst] for n, lst in sources.items()}
     for n, it in items.items():
         it["sources"] = sources.get(n, [])
 

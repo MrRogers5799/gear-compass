@@ -4,7 +4,16 @@ import { supabase } from '../lib/supabase';
 import { DEFAULT_WEIGHTS, type Weights } from '../lib/scoring';
 import type { Skill } from '../types';
 
+export const ACCOUNT_TYPES = ['regular', 'ironman', 'hardcore', 'ultimate', 'group'] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+export const ACCOUNT_LABEL: Record<AccountType, string> = {
+  regular: 'Regular', ironman: 'Ironman', hardcore: 'Hardcore Ironman', ultimate: 'Ultimate Ironman', group: 'Group Ironman',
+};
+/** Any ironman variant: can't use the GE, so gear has to be earned. */
+export const isIron = (t: AccountType) => t !== 'regular';
+
 export interface UserData {
+  accountType: AccountType;
   owned: string[];
   wanted: string[];
   /** Prayers the player has unlocked (scroll read / quest done) */
@@ -18,7 +27,7 @@ export interface UserData {
   hideLocked: boolean;
 }
 
-const EMPTY: UserData = { owned: [], wanted: [], prayers: [], rsn: '', levels: {}, weights: DEFAULT_WEIGHTS, budget: null, hideLocked: false };
+const EMPTY: UserData = { accountType: 'regular', owned: [], wanted: [], prayers: [], rsn: '', levels: {}, weights: DEFAULT_WEIGHTS, budget: null, hideLocked: false };
 const LOCAL_KEY = 'gear-compass:v1';
 
 function loadLocal(): UserData {

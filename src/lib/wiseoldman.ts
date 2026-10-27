@@ -5,6 +5,8 @@ const SKILLS: Skill[] = ['attack', 'strength', 'defence', 'ranged', 'magic', 'pr
 
 interface WomPlayer {
   displayName: string;
+  /** 'regular' | 'ironman' | 'hardcore' | 'ultimate' | 'unknown' */
+  type: string;
   latestSnapshot: { data: { skills: Record<string, { level: number }> } } | null;
 }
 
@@ -12,7 +14,12 @@ interface WomPlayer {
  * Fetch combat levels for an OSRS name from Wise Old Man.
  * `refresh` asks WOM to re-pull from the official hiscores first (also registers new players).
  */
-export async function fetchLevels(rsn: string, refresh = false): Promise<{ name: string; levels: Partial<Record<Skill, number>> }> {
+export async function fetchLevels(rsn: string, refresh = false): Promise<{
+  name: string;
+  levels: Partial<Record<Skill, number>>;
+  /** Hiscores account type; null when WOM doesn't know */
+  type: 'regular' | 'ironman' | 'hardcore' | 'ultimate' | null;
+}> {
   const url = API + encodeURIComponent(rsn.trim());
   let res = await fetch(url, refresh ? { method: 'POST' } : undefined);
   if (!refresh && res.status === 404) res = await fetch(url, { method: 'POST' });
@@ -25,5 +32,6 @@ export async function fetchLevels(rsn: string, refresh = false): Promise<{ name:
   if (!skills) throw new Error('No hiscores data for that player yet.');
   const levels: Partial<Record<Skill, number>> = {};
   for (const s of SKILLS) if (skills[s]) levels[s] = skills[s].level;
-  return { name: player.displayName, levels };
+  const type = (['regular', 'ironman', 'hardcore', 'ultimate'] as const).find(t => t === player.type) ?? null;
+  return { name: player.displayName, levels, type };
 }

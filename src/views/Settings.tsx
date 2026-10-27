@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useUserData } from '../hooks/UserData';
+import { ACCOUNT_LABEL, ACCOUNT_TYPES, isIron, useUserData, type AccountType } from '../hooks/UserData';
 import { fetchLevels } from '../lib/wiseoldman';
 import { DEFAULT_WEIGHTS } from '../lib/scoring';
 import { capitalize, formatGp, parseGp } from '../lib/wiki';
@@ -20,10 +20,13 @@ export function Settings() {
     setBusy(true);
     setStatus(refresh ? 'Asking Wise Old Man to update from the hiscores…' : 'Looking up…');
     try {
-      const { name, levels } = await fetchLevels(rsn, refresh);
-      update({ rsn: name, levels });
+      const { name, levels, type } = await fetchLevels(rsn, refresh);
+      // Group ironmen show as regular on the hiscores, so don't let that overwrite a manual "Group" choice.
+      const keepGroup = type === 'regular' && data.accountType === 'group';
+      const accountType: AccountType = type && !keepGroup ? type : data.accountType;
+      update({ rsn: name, levels, accountType });
       setRsn(name);
-      setStatus(`Imported levels for ${name}.`);
+      setStatus(`Imported levels for ${name} (${ACCOUNT_LABEL[accountType]}).`);
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
@@ -59,6 +62,15 @@ export function Settings() {
             title="Ask Wise Old Man to pull fresh data from the hiscores">Refresh</button>
         </form>
         {status && <p className="small">{status}</p>}
+        <label className="row-gap">
+          <span>Account type</span>
+          <select value={data.accountType} onChange={e => update({ accountType: e.target.value as AccountType })}>
+            {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_LABEL[t]}</option>)}
+          </select>
+        </label>
+        {isIron(data.accountType) && (
+          <p className="muted small">Iron mode: GE prices and buying suggestions are hidden, and upgrades focus on drops you can farm.</p>
+        )}
         <div className="levels">
           {SKILLS.map(s => (
             <label key={s}>
@@ -86,12 +98,14 @@ export function Settings() {
         </div>
         <button className="btn" onClick={() => update({ weights: DEFAULT_WEIGHTS })}>Reset to defaults</button>
 
-        <h3 style={{ marginTop: 20 }}>Budget</h3>
-        <p className="muted small">Caps upgrade suggestions and the "Within budget" filter. Use values like 5m or 500k.</p>
-        <form className="row-gap" onSubmit={e => { e.preventDefault(); saveBudget(); }}>
-          <input placeholder="No limit" value={budget} onChange={e => setBudget(e.target.value)} onBlur={saveBudget} />
-          <button className="btn primary">Save</button>
-        </form>
+        {!isIron(data.accountType) && <>
+          <h3 style={{ marginTop: 20 }}>Budget</h3>
+          <p className="muted small">Caps upgrade suggestions and the "Within budget" filter. Use values like 5m or 500k.</p>
+          <form className="row-gap" onSubmit={e => { e.preventDefault(); saveBudget(); }}>
+            <input placeholder="No limit" value={budget} onChange={e => setBudget(e.target.value)} onBlur={saveBudget} />
+            <button className="btn primary">Save</button>
+          </form>
+        </>}
       </div>
     </section>
   );

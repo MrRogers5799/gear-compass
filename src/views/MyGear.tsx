@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
 import { checkReqs, type Scored } from '../lib/scoring';
-import { farmableSource, READINESS } from '../lib/readiness';
+import { canFarm, farmableSource, READINESS } from '../lib/readiness';
 import { formatGp, imageUrl } from '../lib/wiki';
 import { ItemName, LockBadge, OwnWant, ReadinessBadge } from '../components/ui';
-import type { Item } from '../types';
+import type { Item, Source } from '../types';
 
 /** Only suggest items recommended in a reasonable number of places, so one-boss niche gear doesn't dominate. */
 const MIN_USES = 3;
@@ -13,10 +13,10 @@ const MIN_USES = 3;
 const ownedKey = (item: Item) => `${item.slot}:${item.style === 'mixed' ? 'all' : item.style}`;
 
 export function MyGear() {
-  const { data, scores, price, readiness, contentById } = useGear();
+  const { data, scores, price, readiness, iron } = useGear();
   const { data: user } = useUserData();
 
-  const { buys, unlocks, farms, bestOwned } = useMemo(() => {
+  const { buys, unlocks, farms, reach, bestOwned } = useMemo(() => {
     // Best owned score per slot+style, so a whip doesn't make every ranged weapon look like a downgrade.
     const bestOwned = new Map<string, number>();
     for (const n of user.owned) {
@@ -49,9 +49,16 @@ export function MyGear() {
       .map(c => ({ ...c, src: farmableSource(c.s.item, readiness) }))
       .filter(c => c.src)
       .sort((a, b) => b.gain - a.gain)
-      .slice(0, 8);
-    return { buys, unlocks, farms, bestOwned };
-  }, [scores, user.owned, user.levels, user.budget, price, readiness]);
+      .slice(0, iron ? 12 : 8);
+    // Irons: upgrades from content they're not quite geared for yet — the next goals after "Farm next".
+    const reach = iron ? candidates
+      .filter(c => !c.s.item.sources.some(x => x.contentId && canFarm(readiness.get(x.contentId))))
+      .map(c => ({ ...c, src: c.s.item.sources.find(x => x.contentId && readiness.get(x.contentId)?.level === 'under') }))
+      .filter(c => c.src)
+      .sort((a, b) => b.gain - a.gain)
+      .slice(0, 10) : [];
+    return { buys, unlocks, farms, reach, bestOwned };
+  }, [scores, user.owned, user.levels, user.budget, price, readiness, iron]);
 
   const readyGroups = READINESS.filter(l => l !== 'not' && l !== 'under')
     .map(level => ({ level, list: [...readiness.values()].filter(r => r.level === level).map(r => r.content) }))
@@ -81,17 +88,20 @@ export function MyGear() {
         <p className="muted small">Upgrades that drop from bosses, raids or Slayer tasks you're already geared for.</p>
         <ul className="list">
           {farms.map(({ s, gain, src }) => (
-            <Line key={s.item.name} s={s} extra={
-              <span className="muted small">
-                +{gain} · <a href={`#/content/${src!.contentId}`}>{contentById.get(src!.contentId!)?.name ?? src!.from}</a>
-                {' '}{src!.rate ?? ''}{src!.via && ` (${src!.via})`}
-              </span>
-            } />
+            <Line key={s.item.name} s={s} extra={<SourceHint gain={gain} src={src!} />} />
           ))}
           {!farms.length && <li className="muted">
             {user.owned.length ? 'Nothing yet. Upgrades from content you\'re ready for will show here.' : 'Mark the gear you own to see what you can farm.'}
           </li>}
         </ul>
+        {iron ? <>
+          <h3>Almost farmable</h3>
+          <p className="muted small">Upgrades from content you're Undergeared for. A few more upgrades and these open up.</p>
+          <ul className="list">
+            {reach.map(({ s, gain, src }) => <Line key={s.item.name} s={s} extra={<SourceHint gain={gain} src={src!} />} />)}
+            {!reach.length && <li className="muted">Nothing here right now.</li>}
+          </ul>
+        </> : <>
         <h3>Best value buys</h3>
         <p className="muted small">
           The biggest tradeable upgrades over what you own (for the same slot and combat style) that you can equip and afford.
@@ -104,6 +114,7 @@ export function MyGear() {
           ))}
           {!buys.length && <li className="muted">Nothing found. Try raising your budget.</li>}
         </ul>
+        </>}
         <h3>Unlocks to work toward</h3>
         <p className="muted small">Untradeable gear you earn through quests, minigames or Slayer, and often the best early upgrades.</p>
         <ul className="list">
@@ -137,11 +148,11 @@ export function MyGear() {
           </ul>
         </>}
 
-        <h3 style={{ marginTop: 18 }}>Wishlist {wanted.length > 0 && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
+        <h3 style={{ marginTop: 18 }}>Wishlist {wanted.length > 0 && !iron && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
         <ul className="list">
           {wanted.map(i => {
             const s = scores.get(i.name);
-            return s ? <Line key={i.name} s={s} extra={<><LockBadge item={i} /><span className="muted small">{formatGp(price(i.geId))}</span><OwnWant name={i.name} /></>} /> : null;
+            return s ? <Line key={i.name} s={s} extra={<><LockBadge item={i} />{!iron && <span className="muted small">{formatGp(price(i.geId))}</span>}<OwnWant name={i.name} /></>} /> : null;
           })}
           {!wanted.length && <li className="muted">Mark items as <b>Want</b> to plan your next goals.</li>}
         </ul>
@@ -156,5 +167,15 @@ export function MyGear() {
         </ul>
       </div>
     </section>
+  );
+}
+
+function SourceHint({ gain, src }: { gain: number; src: Source }) {
+  const { contentById } = useGear();
+  return (
+    <span className="muted small">
+      +{gain} · <a href={`#/content/${src.contentId}`}>{contentById.get(src.contentId!)?.name ?? src.from}</a>
+      {' '}{src.rate ?? ''}{src.via && ` (${src.via})`}
+    </span>
   );
 }

@@ -3,7 +3,7 @@ import { useGearData } from './hooks/useGearData';
 import { usePrices } from './hooks/usePrices';
 import { useRoute } from './hooks/useRoute';
 import { useAuth } from './hooks/useAuth';
-import { UserDataProvider, useUserData } from './hooks/UserData';
+import { ACCOUNT_LABEL, UserDataProvider, isIron, useUserData } from './hooks/UserData';
 import { GearContext } from './hooks/Gear';
 import { computeScores } from './lib/scoring';
 import { computeReadiness } from './lib/readiness';
@@ -47,7 +47,8 @@ function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth
   const scores = useMemo(() => computeScores(data, user.weights), [data, user.weights]);
   const contentById = useMemo(() => new Map(data.content.map(c => [c.id, c])), [data]);
   const readiness = useMemo(() => computeReadiness(data, user.owned, user.levels), [data, user.owned, user.levels]);
-  const ctx = { data, scores, contentById, readiness, price, openItem: setOpenName };
+  const iron = isIron(user.accountType);
+  const ctx = { data, scores, contentById, readiness, price, iron, openItem: setOpenName };
 
   return (
     <GearContext.Provider value={ctx}>
@@ -60,6 +61,7 @@ function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth
         </nav>
         <span className="grow" />
         <div className="account">
+          {iron && <a className="iron-badge" href="#/settings" title="Account type (change in Settings)">⛓ {ACCOUNT_LABEL[user.accountType]}</a>}
           {!auth.enabled && <span className="muted small" title="Supabase isn't configured for this build">Saved in this browser</span>}
           {auth.enabled && !auth.user && <button className="btn discord" onClick={auth.signIn}>Sign in with Discord</button>}
           {auth.user && (

@@ -6,7 +6,7 @@ import { ItemIcon, LockBadge, OwnWant, SourceList, StyleBadge } from './ui';
 const CATEGORY_LABEL: Record<string, string> = { boss: 'Boss', raid: 'Raid', slayer: 'Slayer', wilderness: 'Wildy', minigame: 'Minigame' };
 
 export function ItemDrawer({ name, onClose }: { name: string | null; onClose: () => void }) {
-  const { data, scores, price } = useGear();
+  const { data, scores, price, iron } = useGear();
   const item = name ? data.items[name] : null;
   const s = name ? scores.get(name) : undefined;
 
@@ -34,7 +34,9 @@ export function ItemDrawer({ name, onClose }: { name: string | null; onClose: ()
             <div className="stats">
               <div className="stat"><b>{s?.score ?? 0}</b><span>Relevance</span></div>
               <div className="stat"><b>{s?.bis ?? 0}</b><span>Best-in-slot at</span></div>
-              <div className="stat"><b>{formatGp(price(item.geId))}</b><span>{item.tradeable ? 'GE price' : 'Untradeable'}</span></div>
+              {iron
+                ? <div className="stat"><b>{item.sources.find(x => x.rate)?.rate ?? '—'}</b><span>Best drop rate</span></div>
+                : <div className="stat"><b>{formatGp(price(item.geId))}</b><span>{item.tradeable ? 'GE price' : 'Untradeable'}</span></div>}
             </div>
             <div className="row-gap">
               <OwnWant name={item.name} />
@@ -51,7 +53,7 @@ export function ItemDrawer({ name, onClose }: { name: string | null; onClose: ()
               </div>
             )}
             <h3>How to get it</h3>
-            {item.tradeable && <p className="small">Buy on the Grand Exchange for <b>{formatGp(price(item.geId))}</b>, or:</p>}
+            {item.tradeable && !iron && <p className="small">Buy on the Grand Exchange for <b>{formatGp(price(item.geId))}</b>, or:</p>}
             <SourceList sources={item.sources} />
             <h3>Recommended at {s?.uses ?? 0} places</h3>
             <ul className="used">

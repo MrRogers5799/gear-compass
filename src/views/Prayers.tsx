@@ -7,7 +7,7 @@ import { Chips, LockBadge, SourceList, StyleBadge } from '../components/ui';
 const STYLES = ['all', 'melee', 'ranged', 'magic'] as const;
 
 export function Prayers() {
-  const { data, contentById, price } = useGear();
+  const { data, contentById, price, iron } = useGear();
   const { data: user, toggle } = useUserData();
   const [style, setStyle] = useState<(typeof STYLES)[number]>('all');
 
@@ -49,7 +49,7 @@ export function Prayers() {
                 <details>
                   <summary className="small">
                     <img className="icon" src={imageUrl(p.scroll.image)} alt="" width={18} height={18} /> {p.scroll.name}
-                    {p.scroll.geId != null && <> · GE {formatGp(price(p.scroll.geId))}</>}
+                    {p.scroll.geId != null && !iron && <> · GE {formatGp(price(p.scroll.geId))}</>}
                   </summary>
                   <SourceList sources={p.scroll.sources} />
                 </details>

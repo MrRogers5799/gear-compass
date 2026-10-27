@@ -164,3 +164,5 @@ tbody tr:hover { background: var(--panel-2); }
   .lock, .farm { margin-left: 0; }
   .prayer-grid { grid-template-columns: 1fr; }
 }
+
+.iron-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-decoration: none; white-space: nowrap; }
