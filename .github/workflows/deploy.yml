@@ -1,0 +1,73 @@
+name: Build & deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC: refresh wiki data
+  workflow_dispatch:
+    inputs:
+      refresh_data:
+        description: Re-pull gear data from the OSRS Wiki
+        type: boolean
+        default: true
+
+permissions:
+  contents: write   # commit refreshed data
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pushes made with GITHUB_TOKEN don't trigger workflows, so the refresh
+      # happens here and the same run builds + deploys the new data.
+      - name: Refresh wiki data
+        if: github.event_name == 'schedule' || inputs.refresh_data
+        run: |
+          python scripts/build_data.py public/data/gear.json
+          if ! git diff --quiet -- public/data; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/data
+            git commit -m "Refresh gear data from the OSRS Wiki"
+            git push
+          fi
+
+      # Free Supabase projects pause after 7 days without activity; a weekly read keeps it awake.
+      - name: Keep Supabase awake
+        if: github.event_name == 'schedule' && vars.VITE_SUPABASE_URL != ''
+        run: |
+          curl -sf "${{ vars.VITE_SUPABASE_URL }}/rest/v1/user_data?select=user_id&limit=1" \
+            -H "apikey: ${{ vars.VITE_SUPABASE_ANON_KEY }}" > /dev/null || echo "Supabase ping failed"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
