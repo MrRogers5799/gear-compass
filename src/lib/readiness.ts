@@ -76,16 +76,27 @@ export function computeReadiness(data: GearData, ownedList: string[], levels: Pa
     const all = content.setups.map(s => setupReadiness(s, owned, data, levels));
     // Partial tables (a phase's weapon swap, a 2-slot room note) are trivially "complete"; judge full loadouts.
     const full = all.filter(r => slotCount(r.setup) >= MIN_FULL_SLOTS);
-    const setups = (full.length ? full : all)
+    // Armour-only tables (e.g. "Moons of Peril armour") say nothing about the weapon, so they can't
+    // vouch for readiness on their own; use them only when no setup lists a weapon.
+    const pool = full.length ? full : all;
+    const armed = pool.filter(r => r.setup.slots.weapon?.some(t => t.length));
+    const setups = (armed.length ? armed : pool)
       .sort((a, b) => rank(a.level) - rank(b.level) || b.quality - a.quality);
     // A raid is only as doable as its typical room, so use the median room; elsewhere pick the best-suited setup.
     const best = content.category === 'raid' ? setups[Math.floor(setups.length / 2)] : setups[0];
+    // If the judged setup is armour-only, the weapon comes from the content's other (weapon) tables.
+    let gearLevel = best.level;
+    if (!best.setup.slots.weapon?.some(t => t.length)) {
+      const weapons = content.setups.flatMap(s => s.slots.weapon ?? []).flat();
+      const hasWeapon = weapons.some(n => owned.has(n) && data.items[n] && checkReqs(data.items[n], levels).ok);
+      if (weapons.length && !hasWeapon) gearLevel = 'not';
+    }
     const blockers: string[] = [];
     if (content.slayerLevel && levels.slayer != null && levels.slayer < content.slayerLevel) {
       blockers.push(`Requires ${content.slayerLevel} Slayer (you: ${levels.slayer})`);
     }
     const notes = content.quests.length ? [`Requires ${content.quests.join(', ')}`] : [];
-    out.set(content.id, { content, best, blockers, notes, level: blockers.length ? 'not' : best.level });
+    out.set(content.id, { content, best, blockers, notes, level: blockers.length ? 'not' : gearLevel });
   }
   return out;
 }

@@ -13,6 +13,18 @@ A full run takes about 2–3 minutes (about 90 sequential wiki requests, roughly
 `GEAR_CACHE=<dir>` caches HTTP responses, and `GEAR_DEBUG=1` prints the items
 where the two requirement sources disagree.
 
+## Safety checks (for the unattended weekly run)
+
+- Wiki API errors, which come back as HTTP 200 with an `error` object (ratelimited, `maxlag=5`, readonly...), are retried with backoff. If they persist the run fails, so it never continues with a silently empty result. HTTP and network errors are retried too.
+- Bucket queries are paged at the server's 5,000-row cap, which clamps larger limits without an error.
+- If any osrsreboxed slot file fails to load, the run fails.
+- Before writing, `validate()` checks:
+  - minimum content and item counts, and at least 90% of the previous `gear.json`;
+  - every prayer has a Prayer level and an effect;
+  - requirement coverage of at least 60% and source coverage of at least 75%.
+- If a check fails, the script prints the reasons and exits 1, leaving the old file alone. Otherwise the file is replaced atomically.
+- If nothing but `generated` would change, the existing file is left untouched, so the workflow makes no commit.
+
 ## Sources
 
 | Data | Source |
@@ -52,7 +64,7 @@ after the wiki changes.
 
 1. Drop rows: `from` is the "Dropped from" value without its `#variant` (for example "Abyssal demon#Wilderness Slayer Cave" becomes "Abyssal demon"), and `page` is the drop page. The kind is `drop` for drop type `combat`, `reward` for `reward` (chests, raids, Barrows, caskets), and `other` for anything else (thieving, hunter...). When `Rolls` is above 1, the rate is shown as "7 × 1/2,448". Rows from the rare and gem drop tables are skipped.
 2. Collection-log rows add sources the drop tables miss. Shops and point stores become `other` with a `null` rate. Collection-log recipe rows are ignored.
-3. Items with neither are traced through Bucket `recipe` (up to 4 levels deep), and take the sources of one key component. The script prefers a component that shares the item's first word (Ultor ring → Ultor icon → Ultor vestige), then any component with at most 10 sources that isn't a commodity (`COMMODITY_RX`: runes, bars, wool...), most valuable first. `KEY_COMPONENTS` fixes chains that are too deep or ambiguous (zenyte jewellery → Zenyte shard, Soulreaper axe → the four DT2 parts).
+3. Items with neither are traced through Bucket `recipe` (up to 4 levels deep), and take the sources of one key component. The script prefers a component that shares the item's first word (Ultor ring → Ultor icon → Ultor vestige), then any component with at most 10 sources that isn't a commodity (`COMMODITY_RX`: runes, bars, wool...), most valuable first. `KEY_COMPONENTS` fixes chains that are too deep or ambiguous (zenyte jewellery → Zenyte shard, Abyssal tentacle → Kraken tentacle, Soulreaper axe → the four DT2 parts). Each source's `via` names the component that row came from.
 4. `EXTRA_SOURCES` adds quest and minigame rewards that the wiki has no table for (Fire cape, Infernal cape, Fighter torso, RFD gloves, Mage Training Arena...).
 5. Sources with the same `from` are merged, keeping the best rate. They are sorted by approximate chance ("Always" first, non-numeric rates last), and at most 8 are kept.
 6. `contentId` is matched in this order: `SOURCE_ALIASES` (Unsired → Abyssal Sire, Dagannoth Rex → Dagannoth Kings, Ancient chest → CoX, Monumental chest → ToB, Dusk → Grotesque Guardians, Eldric/Branda → Royal Titans, GWD bodyguards...), then `SOURCE_PREFIX_ALIASES` ("Revenant …"), then the exact content name, then the singular/plural form ("Abyssal demon" → "Abyssal demons"), then the monster's `infobox_monster.slayer_category` (superiors such as "Greater abyssal demon" or "Nuclear smoke devil" map to their task).

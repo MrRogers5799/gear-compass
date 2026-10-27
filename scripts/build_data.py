@@ -168,6 +168,9 @@ KEY_COMPONENTS = {
     "Keris partisan of breaching": "Breach of the Scarab",
     "Hunters' sunlight crossbow": "Sunlight antelope antler",
     "Trident of the Swamp": "Magic fang",
+    # the first-word heuristic would pick Abyssal whip / Yew shortbow / a feather
+    "Abyssal tentacle": "Kraken tentacle", "Bone shortbow": "Scurrius' spine",
+    "Dragon bolts": "Dragon bolts (unf)",
     # several equally rare parts: union of their sources
     "Soulreaper axe": ["Leviathan's lure", "Siren's staff", "Executioner's axe head",
                        "Eye of the Duke"],
@@ -375,35 +378,64 @@ def get(url, params=None, polite=False):
             print(f"  retry ({e})", file=sys.stderr)
             time.sleep(5 * (attempt + 1))
     _last_wiki[0] = time.time()
-    if CACHE:
+    if CACHE and not (isinstance(data, dict) and "error" in data):
         os.makedirs(CACHE, exist_ok=True)
         with open(path, "w", encoding="utf8") as f:
             json.dump(data, f)
     return data
 
 
+WIKI_ATTEMPTS = 5
+
+
 def wiki(**params):
+    """MediaWiki API call. API errors come back as HTTP 200 with an "error"
+    object (ratelimited, maxlag, readonly, internal DB errors...): retry those
+    with backoff and fail the run if they persist, rather than carrying on with
+    a silently empty result."""
     params.setdefault("format", "json")
     params.setdefault("formatversion", 2)
-    return get(API, params, polite=True)
+    params.setdefault("maxlag", 5)
+    for attempt in range(WIKI_ATTEMPTS):
+        d = get(API, params, polite=True)
+        err = d.get("error") if isinstance(d, dict) else None
+        if not err:
+            return d
+        code = err.get("code", "?") if isinstance(err, dict) else str(err)
+        if attempt == WIKI_ATTEMPTS - 1:
+            raise RuntimeError(f"wiki API error after {WIKI_ATTEMPTS} attempts "
+                               f"({params.get('action')}): {err}")
+        wait = 10 * (attempt + 1)
+        print(f"  wiki API error '{code}', retrying in {wait}s", file=sys.stderr)
+        time.sleep(wait)
 
 
 def bucket(query):
     d = wiki(action="bucket", query=query)
-    if "error" in d:
-        raise RuntimeError(f"bucket error: {d['error']}")
+    if "bucket" not in d:
+        raise RuntimeError(f"bucket: no result for {query[:120]}")
     return d["bucket"]
 
 
-def bucket_all(name, fields):
-    sel = ",".join(f"'{f}'" for f in fields)
+BUCKET_LIMIT = 5000      # server-side cap; larger limits are silently clamped
+
+
+def bucket_paged(base):
+    """All rows of a bucket query (`base` = everything before .limit()), paged."""
     out, offset = [], 0
     while True:
-        chunk = bucket(f"bucket('{name}').select({sel}).limit(5000).offset({offset}).run()")
+        chunk = bucket(f"{base}.limit({BUCKET_LIMIT}).offset({offset}).run()")
+        if len(chunk) > BUCKET_LIMIT:
+            raise RuntimeError(f"bucket returned {len(chunk)} rows for limit {BUCKET_LIMIT}")
         out += chunk
-        if len(chunk) < 5000:
+        if len(chunk) < BUCKET_LIMIT:
             return out
-        offset += 5000
+        offset += BUCKET_LIMIT
+
+
+def bucket_all(name, fields, where=""):
+    sel = ",".join(f"'{f}'" for f in fields)
+    return bucket_paged(f"bucket('{name}').select({sel}){where}")
 
 
 def chunks(seq, n=50):
@@ -658,14 +690,7 @@ def bucket_where_in(name, fields, key, values, n=50):
     out = []
     for batch in chunks(sorted(set(values)), n):
         cond = ",".join("{'%s',%s}" % (key, lua_str(v)) for v in batch)
-        offset = 0
-        while True:
-            chunk = bucket(f"bucket('{name}').select({sel}).where(bucket.Or({cond}))"
-                           f".limit(5000).offset({offset}).run()")
-            out += chunk
-            if len(chunk) < 5000:
-                break
-            offset += 5000
+        out += bucket_paged(f"bucket('{name}').select({sel}).where(bucket.Or({cond}))")
     return out
 
 
@@ -843,12 +868,12 @@ def build_sources(names, ids_of, matcher):
     fetched.update(keys)
     for k in keys:
         add_clog(k)
+    merged = {}                   # multi-part item -> [(row, component)]
     for n in names:
         parts = [k for k in key_parts(n) if raw.get(k)]
         if parts and n not in resolved:
-            if len(parts) > 1:      # merged pseudo-entry for multi-part items
-                raw["\0" + n] = [row for k in parts for row in raw[k]]
-                parts = ["\0" + n]
+            if len(parts) > 1:
+                merged[n] = [(row, k) for k in parts for row in raw[k]]
             resolved[n] = parts[0]
     pending = {n: {n} for n in names if n not in resolved and n not in EXTRA_SOURCES}
     visited = defaultdict(set)
@@ -892,22 +917,29 @@ def build_sources(names, ids_of, matcher):
 
     out = {}
     for n in names:
-        rows = list(raw.get(resolved[n], [])) if n in resolved else []
-        for frm, page, rate, kind in EXTRA_SOURCES.get(n, []):
-            rows.append((frm, page, rate, kind))
+        if n in merged:
+            rows = list(merged[n])
+        elif n in resolved:
+            rows = [(row, resolved[n]) for row in raw.get(resolved[n], [])]
+        else:
+            rows = []
+        rows += [(row, n) for row in EXTRA_SOURCES.get(n, [])]
         best = {}
-        for frm, page, rate, kind in rows:
+        for (frm, page, rate, kind), comp in rows:
             p = rate_prob(rate)
             cur = best.get(frm)
             if cur is None or (p or -1) > (cur["_p"] or -1):
                 best[frm] = {"from": frm, "page": page, "rate": rate, "kind": kind,
-                             "contentId": matcher(frm), "_p": p}
+                             "contentId": matcher(frm), "via": comp if comp != n else None,
+                             "_p": p}
         srcs = sorted(best.values(), key=lambda s: (s["_p"] is None, -(s["_p"] or 0),
                                                      s["contentId"] is None, s["from"]))
         for s in srcs[:MAX_SOURCES]:
             del s["_p"]
         out[n] = srcs[:MAX_SOURCES]
-    via = {n: resolved[n].lstrip(chr(0)) or n for n in names if resolved.get(n, n) != n}
+    # item -> component(s) its sources come from (audit output only)
+    via = {n: ", ".join(key_parts(n)) if n in merged else resolved[n]
+           for n in names if resolved.get(n, n) != n}
     return out, via
 
 
@@ -1047,11 +1079,87 @@ def classify_pages(rows):
     return result, excluded
 
 
+# --------------------------------------------------------------------------
+# Output validation
+# --------------------------------------------------------------------------
+# Floors from the Oct 2026 data (101 content, 704 items, 72% with reqs, 84%
+# with a source), with margin. A run below them is treated as degraded.
+MIN_CONTENT, MIN_ITEMS, MIN_PRAYERS = 80, 550, len(PRAYERS)
+MIN_REQ_COVERAGE, MIN_SOURCE_COVERAGE = 0.60, 0.75
+MIN_RATIO_OF_PREVIOUS = 0.90
+
+
+def validate(out, prev):
+    """List of reasons the new data looks degraded (empty = OK)."""
+    bad = []
+    content, items, prayers = out["content"], out["items"], out["prayers"]
+    n = max(1, len(items))
+    if len(content) < MIN_CONTENT:
+        bad.append(f"only {len(content)} content entries (< {MIN_CONTENT})")
+    if len(items) < MIN_ITEMS:
+        bad.append(f"only {len(items)} items (< {MIN_ITEMS})")
+    if len(prayers) < MIN_PRAYERS:
+        bad.append(f"only {len(prayers)} prayers (< {MIN_PRAYERS})")
+    for p in prayers:
+        if not p["reqs"].get("prayer"):
+            bad.append(f"prayer {p['name']} has no Prayer level")
+        if not p["effect"]:
+            bad.append(f"prayer {p['name']} has no effect text")
+    req_cov = sum(1 for i in items.values() if i["reqs"]) / n
+    if req_cov < MIN_REQ_COVERAGE:
+        bad.append(f"requirement coverage {req_cov:.0%} (< {MIN_REQ_COVERAGE:.0%})")
+    src_cov = sum(1 for i in items.values() if i["sources"]) / n
+    if src_cov < MIN_SOURCE_COVERAGE:
+        bad.append(f"source coverage {src_cov:.0%} (< {MIN_SOURCE_COVERAGE:.0%})")
+    if prev:
+        for key in ("content", "items"):
+            old, new = len(prev.get(key) or ()), len(out[key])
+            if old and new < MIN_RATIO_OF_PREVIOUS * old:
+                bad.append(f"{key} dropped from {old} to {new} "
+                           f"(< {MIN_RATIO_OF_PREVIOUS:.0%} of the previous file)")
+    return bad
+
+
+def same_payload(a, b):
+    """True if two GearData dicts differ at most in `generated`."""
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    strip = lambda d: {k: v for k, v in d.items() if k != "generated"}  # noqa: E731
+    return strip(a) == strip(b)
+
+
+def load_previous(path):
+    try:
+        with open(path, encoding="utf8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_output(out, out_path):
+    """Validate, then atomically replace `out_path`. Returns "unchanged" or
+    "written"; exits non-zero (leaving the old file alone) if degraded."""
+    prev = load_previous(out_path)
+    bad = validate(out, prev)
+    if bad:
+        print("\nERROR: refusing to write degraded data to " + out_path + ":", file=sys.stderr)
+        for b in bad:
+            print("  - " + b, file=sys.stderr)
+        sys.exit(1)
+    if same_payload(out, prev):
+        return "unchanged"
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    tmp = out_path + ".tmp"
+    with open(tmp, "w", encoding="utf8") as f:
+        json.dump(out, f, separators=(",", ":"), ensure_ascii=False)
+    os.replace(tmp, out_path)
+    return "written"
+
+
 def main(out_path):
     t0 = time.time()
     print("Fetching recommended equipment tables...")
-    rows = bucket("bucket('recommended_equipment').select('page_name','json')"
-                  ".limit(5000).run()")
+    rows = bucket_all("recommended_equipment", ["page_name", "json"])
     print(f"  {len(rows)} tables")
     page_map, excluded = classify_pages(rows)
 
@@ -1243,11 +1351,9 @@ def main(out_path):
     print("Fetching osrsreboxed equipment requirements...")
     reboxed_by_id, reboxed_by_name = {}, {}
     for s in REBOXED_SLOTS:
-        try:
-            d = get(REBOXED % s)
-        except Exception as e:  # noqa: BLE001
-            print(f"  warning: reboxed {s}: {e}", file=sys.stderr)
-            continue
+        d = get(REBOXED % s)     # fatal on failure: a missing slot silently drops reqs
+        if not isinstance(d, dict) or not d:
+            raise RuntimeError(f"osrsreboxed {s}: empty or malformed response")
         for v in d.values():
             req = ((v.get("equipment") or {}).get("requirements")) or {}
             entry = {k: int(x) for k, x in req.items() if k in SKILLS and x and int(x) > 1}
@@ -1382,8 +1488,8 @@ def main(out_path):
 
     # ---- sources, slayer levels, quests ----------------------------------------
     print("Fetching monster slayer data...")
-    monsters = bucket("bucket('infobox_monster').select('page_name','slayer_level',"
-                      "'slayer_category').where('slayer_level','>',1).limit(5000).run()")
+    monsters = bucket_all("infobox_monster", ["page_name", "slayer_level", "slayer_category"],
+                          ".where('slayer_level','>',1)")
     matcher = ContentMatcher(contents, monsters)
     slayer = slayer_levels(contents, monsters)
 
@@ -1397,8 +1503,7 @@ def main(out_path):
     # Crafted items carry their key component's drops; record which component that is.
     # Raid chest rates on the wiki are the item's share of unique ("purple") loot, not a per-raid chance.
     raid_chests = {"Ancient chest", "Monumental chest", "Chest (Tombs of Amascut)"}
-    sources = {n: [{**s, "via": via.get(n),
-                    "rate": f"{s['rate']} of uniques" if s["from"] in raid_chests and s["rate"] else s["rate"]}
+    sources = {n: [{**s, "rate": f"{s['rate']} of uniques" if s["from"] in raid_chests and s["rate"] else s["rate"]}
                    for s in lst] for n, lst in sources.items()}
     for n, it in items.items():
         it["sources"] = sources.get(n, [])
@@ -1439,9 +1544,7 @@ def main(out_path):
 
     out = {"generated": date.today().isoformat(), "content": content_out, "items": items,
            "prayers": prayers}
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    with open(out_path, "w", encoding="utf8") as f:
-        json.dump(out, f, separators=(",", ":"), ensure_ascii=False)
+    status = write_output(out, out_path)
 
     # ---- audit report -------------------------------------------------------------
     print("\n=== Included content ===")
@@ -1488,7 +1591,10 @@ def main(out_path):
         sc = p["scroll"]
         print(f"  {p['name']}: reqs={p['reqs']} style={p['style']} usedAt={len(p['usedAt'])}"
               + (f" scroll={sc['name']} geId={sc['geId']} sources={len(sc['sources'])}" if sc else ""))
-    print(f"\nWrote {out_path} in {time.time() - t0:.0f}s")
+    if status == "unchanged":
+        print(f"\nNo data changes; left {out_path} untouched ({time.time() - t0:.0f}s)")
+    else:
+        print(f"\nWrote {out_path} in {time.time() - t0:.0f}s")
 
 
 if __name__ == "__main__":

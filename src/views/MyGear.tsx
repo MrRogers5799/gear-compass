@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
-import { checkReqs, type Scored } from '../lib/scoring';
+import { checkReqs } from '../lib/scoring';
 import { canFarm, farmableSource, READINESS } from '../lib/readiness';
 import { formatGp, imageUrl } from '../lib/wiki';
 import { ItemName, LockBadge, OwnWant, ReadinessBadge } from '../components/ui';
@@ -73,9 +73,9 @@ export function MyGear() {
   const owned = user.owned.map(n => data.items[n]).filter(Boolean)
     .sort((a, b) => a.slot.localeCompare(b.slot) || a.name.localeCompare(b.name));
 
-  const Line = ({ s, extra }: { s: Scored; extra?: React.ReactNode }) => (
+  const Line = ({ item, extra }: { item: Item; extra?: React.ReactNode }) => (
     <li>
-      <ItemName item={s.item} showSlot />
+      <ItemName item={item} showSlot />
       <span className="grow" />
       {extra}
     </li>
@@ -88,7 +88,7 @@ export function MyGear() {
         <p className="muted small">Upgrades that drop from bosses, raids or Slayer tasks you're already geared for.</p>
         <ul className="list">
           {farms.map(({ s, gain, src }) => (
-            <Line key={s.item.name} s={s} extra={<SourceHint gain={gain} src={src!} />} />
+            <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />
           ))}
           {!farms.length && <li className="muted">
             {user.owned.length ? 'Nothing yet. Upgrades from content you\'re ready for will show here.' : 'Mark the gear you own to see what you can farm.'}
@@ -98,7 +98,7 @@ export function MyGear() {
           <h3>Almost farmable</h3>
           <p className="muted small">Upgrades from content you're Undergeared for. A few more upgrades and these open up.</p>
           <ul className="list">
-            {reach.map(({ s, gain, src }) => <Line key={s.item.name} s={s} extra={<SourceHint gain={gain} src={src!} />} />)}
+            {reach.map(({ s, gain, src }) => <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />)}
             {!reach.length && <li className="muted">Nothing here right now.</li>}
           </ul>
         </> : <>
@@ -110,7 +110,7 @@ export function MyGear() {
         </p>
         <ul className="list">
           {buys.map(({ s, gain, p }) => (
-            <Line key={s.item.name} s={s} extra={<span className="muted small">+{gain} · {formatGp(p)}</span>} />
+            <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain} · {formatGp(p)}</span>} />
           ))}
           {!buys.length && <li className="muted">Nothing found. Try raising your budget.</li>}
         </ul>
@@ -118,7 +118,7 @@ export function MyGear() {
         <h3>Unlocks to work toward</h3>
         <p className="muted small">Untradeable gear you earn through quests, minigames or Slayer, and often the best early upgrades.</p>
         <ul className="list">
-          {unlocks.map(({ s, gain }) => <Line key={s.item.name} s={s} extra={<span className="muted small">+{gain}</span>} />)}
+          {unlocks.map(({ s, gain }) => <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain}</span>} />)}
         </ul>
       </div>
 
@@ -151,8 +151,7 @@ export function MyGear() {
         <h3 style={{ marginTop: 18 }}>Wishlist {wanted.length > 0 && !iron && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
         <ul className="list">
           {wanted.map(i => {
-            const s = scores.get(i.name);
-            return s ? <Line key={i.name} s={s} extra={<><LockBadge item={i} />{!iron && <span className="muted small">{formatGp(price(i.geId))}</span>}<OwnWant name={i.name} /></>} /> : null;
+            return <Line key={i.name} item={i} extra={<><LockBadge item={i} />{!iron && <span className="muted small">{formatGp(price(i.geId))}</span>}<OwnWant name={i.name} /></>} />;
           })}
           {!wanted.length && <li className="muted">Mark items as <b>Want</b> to plan your next goals.</li>}
         </ul>
@@ -160,8 +159,8 @@ export function MyGear() {
         <ul className="list">
           {owned.map(i => {
             const s = scores.get(i.name);
-            const top = bestOwned.get(ownedKey(i)) === s?.score;
-            return s ? <Line key={i.name} s={s} extra={<>{top && <span className="badge">best owned</span>}<OwnWant name={i.name} /></>} /> : null;
+            const top = s != null && bestOwned.get(ownedKey(i)) === s.score;
+            return <Line key={i.name} item={i} extra={<>{top && <span className="badge">best owned</span>}<OwnWant name={i.name} /></>} />;
           })}
           {!owned.length && <li className="muted">Mark items as <b>Own</b> on the Rankings or Content pages.</li>}
         </ul>

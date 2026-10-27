@@ -31,7 +31,7 @@ export default function App() {
   if (error) return <p className="pad">Couldn't load gear data: {error}</p>;
   if (!data || !auth.ready) return <p className="pad muted">Loading…</p>;
   return (
-    <UserDataProvider user={auth.user}>
+    <UserDataProvider userId={auth.user?.id ?? null}>
       <Shell data={data} auth={auth} />
     </UserDataProvider>
   );
@@ -39,7 +39,7 @@ export default function App() {
 
 function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth> }) {
   const [view = 'rankings', ...params] = useRoute();
-  const { data: user, sync } = useUserData();
+  const { data: user, sync, flush } = useUserData();
   const price = usePrices();
   const [openName, setOpenName] = useState<string | null>(null);
   const closeItem = useCallback(() => setOpenName(null), []);
@@ -68,7 +68,7 @@ function Shell({ data, auth }: { data: GearData; auth: ReturnType<typeof useAuth
             <>
               <span className="small">{auth.displayName}</span>
               <span className={`sync ${sync}`} title={`Sync: ${sync}`} />
-              <button className="btn" onClick={auth.signOut}>Sign out</button>
+              <button className="btn" onClick={async () => { await flush(); await auth.signOut(); }}>Sign out</button>
             </>
           )}
         </div>

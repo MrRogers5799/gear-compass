@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ACCOUNT_LABEL, ACCOUNT_TYPES, isIron, useUserData, type AccountType } from '../hooks/UserData';
 import { fetchLevels } from '../lib/wiseoldman';
 import { DEFAULT_WEIGHTS } from '../lib/scoring';
@@ -14,6 +14,10 @@ export function Settings() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [budget, setBudget] = useState(data.budget == null ? '' : formatGp(data.budget));
+
+  // Synced data can arrive after this page mounts; keep the text fields in step with it.
+  useEffect(() => setRsn(data.rsn), [data.rsn]);
+  useEffect(() => setBudget(data.budget == null ? '' : formatGp(data.budget)), [data.budget]);
 
   const importLevels = async (refresh: boolean) => {
     if (!rsn.trim()) return;
@@ -46,7 +50,11 @@ export function Settings() {
 
   const saveBudget = () => {
     const gp = budget.trim() ? parseGp(budget) : null;
-    update({ budget: gp });
+    if (budget.trim() && gp == null) {  // unreadable input: put the saved value back rather than clearing it
+      setBudget(data.budget == null ? '' : formatGp(data.budget));
+      return;
+    }
+    if (gp !== data.budget) update({ budget: gp });
     setBudget(gp == null ? '' : formatGp(gp));
   };
 
