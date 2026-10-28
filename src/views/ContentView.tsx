@@ -5,7 +5,7 @@ import { navigate } from '../hooks/useRoute';
 import { checkReqs } from '../lib/scoring';
 import { pageUrl } from '../lib/wiki';
 import { READINESS_LABEL, setupReadiness, type Readiness } from '../lib/readiness';
-import { Chips, ItemIcon, ReadinessBadge } from '../components/ui';
+import { Chips, ItemIcon, PageHeader, ReadinessBadge } from '../components/ui';
 import type { Category, Slot } from '../types';
 
 const CATEGORIES = ['boss', 'raid', 'slayer', 'wilderness', 'minigame'] as const;
@@ -45,12 +45,13 @@ export function ContentView({ id, setupIndex }: { id?: string; setupIndex: numbe
       <div className="toolbar">
         <Chips options={CATEGORIES} value={category} onChange={pickCategory} label={c => CATEGORY_LABEL[c]} />
       </div>
-      <div className="toolbar">
-        <select value={content.id} onChange={e => navigate('content', e.target.value)} aria-label="Choose content">
+      <PageHeader title={content.name} subtitle={
+        <>{CATEGORY_LABEL[category]} · <a href={pageUrl(content.page)} target="_blank" rel="noopener">Strategy guide on the wiki ↗</a></>
+      }>
+        <select value={content.id} onChange={e => navigate('content', e.target.value)} aria-label="Choose boss or task">
           {list.map(c => <option key={c.id} value={c.id}>{c.name} · {READINESS_LABEL[readiness.get(c.id)!.level]}</option>)}
         </select>
-        <a href={pageUrl(content.page)} target="_blank" rel="noopener">Strategy guide on the wiki ↗</a>
-      </div>
+      </PageHeader>
       <div className={`card pad readiness-card r-${r.level}`}>
         <div className="row-gap" style={{ margin: 0 }}>
           <ReadinessBadge level={r.level} />

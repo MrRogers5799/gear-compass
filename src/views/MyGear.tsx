@@ -1,10 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
 import { checkReqs } from '../lib/scoring';
 import { canFarm, farmableSource, READINESS } from '../lib/readiness';
 import { formatGp, imageUrl } from '../lib/wiki';
-import { ItemName, LockBadge, OwnWant, ReadinessBadge } from '../components/ui';
+import { GettingStarted, ItemName, LockBadge, OwnWant, PageHeader, ReadinessBadge } from '../components/ui';
 import type { Item, Source } from '../types';
 
 /** Only suggest items recommended in a reasonable number of places, so one-boss niche gear doesn't dominate. */
@@ -15,6 +15,7 @@ const ownedKey = (item: Item) => `${item.slot}:${item.style === 'mixed' ? 'all' 
 export function MyGear() {
   const { data, scores, price, readiness, iron } = useGear();
   const { data: user } = useUserData();
+  const [tab, setTab] = useState<'farm' | 'buy' | 'reach' | 'unlock' | null>(null);
 
   const { buys, unlocks, farms, reach, bestOwned } = useMemo(() => {
     // Best owned score per slot+style, so a whip doesn't make every ranged weapon look like a downgrade.
@@ -81,89 +82,126 @@ export function MyGear() {
     </li>
   );
 
+  const readyCount = [...readiness.values()].filter(r => canFarm(r)).length;
+  const tabs = iron
+    ? [['farm', `Farm next (${farms.length})`], ['reach', `Almost farmable (${reach.length})`], ['unlock', `Unlocks (${unlocks.length})`]] as const
+    : [['farm', `Farm next (${farms.length})`], ['buy', `Buy (${buys.length})`], ['unlock', `Unlocks (${unlocks.length})`]] as const;
+  const counts = { farm: farms.length, buy: buys.length, reach: reach.length, unlock: unlocks.length };
+  // Until the player picks a tab, open the first one that has something in it.
+  const activeTab = tabs.some(([t]) => t === tab) ? tab! : tabs.find(([t]) => counts[t] > 0)?.[0] ?? 'farm';
+
   return (
-    <section className="grid2">
-      <div className="card pad">
-        <h3>Farm next</h3>
-        <p className="muted small">Upgrades that drop from bosses, raids or Slayer tasks you're already geared for.</p>
-        <ul className="list">
-          {farms.map(({ s, gain, src }) => (
-            <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />
-          ))}
-          {!farms.length && <li className="muted">
-            {user.owned.length ? 'Nothing yet. Upgrades from content you\'re ready for will show here.' : 'Mark the gear you own to see what you can farm.'}
-          </li>}
-        </ul>
-        {iron ? <>
-          <h3>Almost farmable</h3>
-          <p className="muted small">Upgrades from content you're Undergeared for. A few more upgrades and these open up.</p>
-          <ul className="list">
-            {reach.map(({ s, gain, src }) => <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />)}
-            {!reach.length && <li className="muted">Nothing here right now.</li>}
-          </ul>
-        </> : <>
-        <h3>Best value buys</h3>
-        <p className="muted small">
-          The biggest tradeable upgrades over what you own (for the same slot and combat style) that you can equip and afford.
-          {user.budget != null ? ` Capped at your ${formatGp(user.budget)} budget.` : ' Set a budget in Settings to cap these.'}
-          {Object.keys(user.levels).length === 0 && ' Add your levels in Settings to hide gear you can\'t equip.'}
-        </p>
-        <ul className="list">
-          {buys.map(({ s, gain, p }) => (
-            <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain} · {formatGp(p)}</span>} />
-          ))}
-          {!buys.length && <li className="muted">Nothing found. Try raising your budget.</li>}
-        </ul>
-        </>}
-        <h3>Unlocks to work toward</h3>
-        <p className="muted small">Untradeable gear you earn through quests, minigames or Slayer, and often the best early upgrades.</p>
-        <ul className="list">
-          {unlocks.map(({ s, gain }) => <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain}</span>} />)}
-        </ul>
+    <section>
+      <PageHeader title="My gear" subtitle="What to go after next, based on the gear you own and your levels." />
+      <GettingStarted />
+      <div className="tiles">
+        <a className="tile" href="#/content"><b>{readyCount}</b><span>bosses &amp; tasks you're ready for</span></a>
+        <div className="tile"><b>{farms.length}</b><span>upgrades you can farm now</span></div>
+        <div className="tile"><b>{owned.length}</b><span>items owned</span></div>
+        <div className="tile"><b>{wanted.length}</b><span>on your wishlist{!iron && wanted.length > 0 ? ` · ${formatGp(wishlistCost)}` : ''}</span></div>
       </div>
 
-      <div className="card pad">
-        <h3>Where you're ready</h3>
-        {readyGroups.map(g => (
-          <div key={g.level} className="ready-group">
-            <ReadinessBadge level={g.level} />
-            <span className="ready-list">
-              {g.list.map((c, i) => <span key={c.id}>{i > 0 && ', '}<a href={`#/content/${c.id}`}>{c.name}</a></span>)}
-            </span>
-          </div>
-        ))}
-        {!readyGroups.length && <p className="muted small">Nothing yet. Mark the gear you own and this fills in.</p>}
-
-        {prayersToUnlock.length > 0 && <>
-          <h3 style={{ marginTop: 18 }}>Prayers to unlock</h3>
-          <ul className="list">
-            {prayersToUnlock.map(p => (
-              <li key={p.name}>
-                <a className="item-name" href="#/prayers"><img className="icon" src={imageUrl(p.image)} alt="" width={24} height={24} />{p.name}</a>
-                <LockBadge item={p} />
-                <span className="grow" />
-                <span className="muted small">used at {p.usedAt.length}</span>
-              </li>
+      <div className="grid2">
+        <div className="card pad">
+          <h2 className="card-title">Upgrades</h2>
+          <div className="tabs" role="tablist">
+            {tabs.map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={activeTab === id} className={'tab' + (activeTab === id ? ' on' : '')} onClick={() => setTab(id)}>
+                {label}
+              </button>
             ))}
-          </ul>
-        </>}
+          </div>
+          {activeTab === 'farm' && <>
+            <p className="muted small">Drops from bosses, raids or Slayer tasks you're already geared for. Biggest improvement first.</p>
+            <ul className="list">
+              {farms.map(({ s, gain, src }) => <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />)}
+              {!farms.length && <li className="muted">
+                {user.owned.length ? "Nothing yet. Upgrades from content you're ready for will show here." : 'Mark the gear you own to see what you can farm.'}
+              </li>}
+            </ul>
+          </>}
+          {activeTab === 'reach' && <>
+            <p className="muted small">Upgrades from content you're Undergeared for. A few more upgrades and these open up.</p>
+            <ul className="list">
+              {reach.map(({ s, gain, src }) => <Line key={s.item.name} item={s.item} extra={<SourceHint gain={gain} src={src!} />} />)}
+              {!reach.length && <li className="muted">Nothing here right now.</li>}
+            </ul>
+          </>}
+          {activeTab === 'buy' && <>
+            <p className="muted small">
+              The biggest tradeable upgrades (same slot and combat style) you can equip and afford.
+              {user.budget != null ? ` Capped at your ${formatGp(user.budget)} budget.` : <> <a href="#/settings">Set a budget</a> to cap these.</>}
+            </p>
+            <ul className="list">
+              {buys.map(({ s, gain, p }) => <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain} · {formatGp(p)}</span>} />)}
+              {!buys.length && <li className="muted">Nothing found. Try raising your budget.</li>}
+            </ul>
+          </>}
+          {activeTab === 'unlock' && <>
+            <p className="muted small">Untradeable gear earned through quests, minigames or Slayer, and often the best early upgrades.</p>
+            <ul className="list">
+              {unlocks.map(({ s, gain }) => <Line key={s.item.name} item={s.item} extra={<span className="muted small">+{gain}</span>} />)}
+              {!unlocks.length && <li className="muted">Nothing here right now.</li>}
+            </ul>
+          </>}
+          {Object.keys(user.levels).length === 0 && (
+            <p className="muted small"><a href="#/settings">Add your levels</a> so suggestions skip gear you can't equip yet.</p>
+          )}
+        </div>
 
-        <h3 style={{ marginTop: 18 }}>Wishlist {wanted.length > 0 && !iron && <span className="muted small">· {formatGp(wishlistCost)} total</span>}</h3>
-        <ul className="list">
-          {wanted.map(i => {
-            return <Line key={i.name} item={i} extra={<><LockBadge item={i} />{!iron && <span className="muted small">{formatGp(price(i.geId))}</span>}<OwnWant name={i.name} /></>} />;
-          })}
-          {!wanted.length && <li className="muted">Mark items as <b>Want</b> to plan your next goals.</li>}
-        </ul>
-        <h3>Owned</h3>
-        <ul className="list">
-          {owned.map(i => {
-            const s = scores.get(i.name);
-            const top = s != null && bestOwned.get(ownedKey(i)) === s.score;
-            return <Line key={i.name} item={i} extra={<>{top && <span className="badge">best owned</span>}<OwnWant name={i.name} /></>} />;
-          })}
-          {!owned.length && <li className="muted">Mark items as <b>Own</b> on the Rankings or Content pages.</li>}
-        </ul>
+        <div className="stack">
+          <div className="card pad">
+            <h2 className="card-title">Where you're ready</h2>
+            {readyGroups.map(g => (
+              <details key={g.level} className="ready-group" open={g.list.length <= 8}>
+                <summary><ReadinessBadge level={g.level} /> <span className="muted small">{g.list.length}</span></summary>
+                <p className="ready-list">
+                  {g.list.map((c, i) => <span key={c.id}>{i > 0 && ', '}<a href={`#/content/${c.id}`}>{c.name}</a></span>)}
+                </p>
+              </details>
+            ))}
+            {!readyGroups.length && <p className="muted small">Nothing yet. Mark the gear you own and this fills in.</p>}
+          </div>
+
+          {prayersToUnlock.length > 0 && (
+            <div className="card pad">
+              <h2 className="card-title">Prayers to unlock</h2>
+              <ul className="list">
+                {prayersToUnlock.map(p => (
+                  <li key={p.name}>
+                    <a className="item-name" href="#/prayers"><img className="icon" src={imageUrl(p.image)} alt="" width={24} height={24} />{p.name}</a>
+                    <LockBadge item={p} />
+                    <span className="grow" />
+                    <span className="muted small">used at {p.usedAt.length}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="card pad">
+            <h2 className="card-title">Wishlist</h2>
+            <ul className="list">
+              {wanted.map(i => (
+                <Line key={i.name} item={i} extra={<><LockBadge item={i} />{!iron && <span className="muted small">{formatGp(price(i.geId))}</span>}<OwnWant name={i.name} /></>} />
+              ))}
+              {!wanted.length && <li className="muted small">Mark items as <b>Want</b> to plan your next goals.</li>}
+            </ul>
+          </div>
+
+          <details className="card pad" open={owned.length <= 12}>
+            <summary className="card-title">Owned <span className="muted small">{owned.length}</span></summary>
+            <ul className="list">
+              {owned.map(i => {
+                const s = scores.get(i.name);
+                // Only flag the exception: owned items outclassed by something else you own.
+                const spare = s != null && (bestOwned.get(ownedKey(i)) ?? 0) > s.score;
+                return <Line key={i.name} item={i} extra={<>{spare && <span className="muted small" title="You own something better for this slot and style">spare</span>}<OwnWant name={i.name} /></>} />;
+              })}
+              {!owned.length && <li className="muted small">Mark items as <b>Own</b> on the Rankings or Bosses &amp; Slayer pages.</li>}
+            </ul>
+          </details>
+        </div>
       </div>
     </section>
   );

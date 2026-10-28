@@ -4,6 +4,7 @@ import { fetchLevels } from '../lib/wiseoldman';
 import { DEFAULT_WEIGHTS } from '../lib/scoring';
 import { capitalize, formatGp, parseGp } from '../lib/wiki';
 import { CATEGORY_LABEL } from './ContentView';
+import { PageHeader } from '../components/ui';
 import type { Category, Skill } from '../types';
 
 const SKILLS: Skill[] = ['attack', 'strength', 'defence', 'ranged', 'magic', 'prayer', 'hitpoints', 'slayer'];
@@ -59,7 +60,9 @@ export function Settings() {
   };
 
   return (
-    <section className="grid2">
+    <section>
+      <PageHeader title="Settings" subtitle="Your levels, account type and what content counts toward rankings." />
+      <div className="grid2">
       <div className="card pad">
         <h3>Your account</h3>
         <p className="muted small">Import combat levels from the hiscores through Wise Old Man, or type them in yourself.</p>
@@ -114,6 +117,7 @@ export function Settings() {
             <button className="btn primary">Save</button>
           </form>
         </>}
+      </div>
       </div>
     </section>
   );

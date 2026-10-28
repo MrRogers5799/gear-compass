@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGear } from '../hooks/Gear';
 import { useUserData } from '../hooks/UserData';
 import { capitalize, formatGp, imageUrl, pageUrl } from '../lib/wiki';
-import { Chips, LockBadge, SourceList, StyleBadge } from '../components/ui';
+import { Chips, PageHeader, LockBadge, SourceList, StyleBadge } from '../components/ui';
 
 const STYLES = ['all', 'melee', 'ranged', 'magic'] as const;
 
@@ -17,13 +17,10 @@ export function Prayers() {
 
   return (
     <section>
+      <PageHeader title="Prayers" subtitle="Combat prayers ranked by how many strategy guides recommend them. Mark scroll and quest unlocks once you have them." />
       <div className="toolbar">
         <Chips options={STYLES} value={style} onChange={setStyle} />
       </div>
-      <p className="muted small">
-        Combat prayers ranked by how many strategy guides recommend them. Some need a scroll or quest to unlock, so mark
-        those as unlocked once you have them.
-      </p>
       <div className="prayer-grid">
         {prayers.map(p => {
           const unlocked = !p.unlock || user.prayers.includes(p.name);

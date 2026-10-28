@@ -131,7 +131,7 @@ tbody tr:hover { background: var(--panel-2); }
 .readiness-card { margin-bottom: 12px; border-left: 4px solid var(--r, var(--line)); }
 .readiness-card p { margin: 6px 0 0; }
 .lock-text { color: var(--danger); font-size: 13px; }
-.ready-group { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; }
+.ready-group { margin-bottom: 6px; }
 .ready-list { font-size: 13px; }
 .farm { display: block; font-size: 11px; color: var(--own); margin: 2px 0 0 42px; }
 
@@ -166,3 +166,38 @@ tbody tr:hover { background: var(--panel-2); }
 }
 
 .iron-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-decoration: none; white-space: nowrap; }
+
+/* Page structure */
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+.page-header h1 { margin: 0; font-size: 24px; letter-spacing: -.2px; }
+.page-header p { margin: 4px 0 0; max-width: 70ch; }
+.card-title { margin: 0 0 10px; font-size: 16px; font-weight: 650; }
+summary.card-title { cursor: pointer; }
+.stack { display: grid; gap: 16px; align-content: start; }
+.filters { padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+
+/* Getting started */
+.intro { margin-bottom: 16px; border-left: 4px solid var(--accent); }
+.intro .close { float: right; }
+.intro ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.intro li.done { color: var(--muted); text-decoration: line-through; }
+
+/* Summary tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); text-decoration: none; }
+.tile b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--muted); }
+a.tile:hover { border-color: var(--accent); }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; flex-wrap: wrap; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer; color: var(--muted); margin-bottom: -1px; }
+.tab.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+.ready-group summary { cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.ready-group .ready-list { margin: 6px 0 10px; }
+
+@media (max-width: 720px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .page-header h1 { font-size: 20px; }
+}

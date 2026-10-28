@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { imageUrl, capitalize, pageUrl } from '../lib/wiki';
 import { checkReqs } from '../lib/scoring';
 import { READINESS_LABEL, type Readiness } from '../lib/readiness';
@@ -52,6 +52,41 @@ export function LockBadge({ item }: { item: Pick<Item, 'reqs'> }) {
   if (check.ok) return null;
   const text = check.missing.map(m => `${m.need} ${capitalize(m.skill)} (you: ${m.have})`).join(', ');
   return <span className="lock" title={`Requires ${text}`}>🔒 {check.missing.map(m => `${m.need} ${SKILL_ABBR[m.skill]}`).join(' · ')}</span>;
+}
+
+export function PageHeader({ title, subtitle, children }: { title: string; subtitle: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="page-header">
+      <div>
+        <h1>{title}</h1>
+        <p className="muted">{subtitle}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const INTRO_KEY = 'gear-compass:intro-dismissed';
+
+/** First-visit guide: shown until the player has set levels or marked gear, or dismisses it. */
+export function GettingStarted() {
+  const { data } = useUserData();
+  const [dismissed, setDismissed] = useState(() => { try { return !!localStorage.getItem(INTRO_KEY); } catch { return false; } });
+  const hasLevels = Object.keys(data.levels).length > 0;
+  const hasGear = data.owned.length > 0;
+  if (dismissed || (hasLevels && hasGear)) return null;
+  const dismiss = () => { setDismissed(true); try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* ignore */ } };
+  return (
+    <div className="card pad intro">
+      <button className="btn close" onClick={dismiss} aria-label="Dismiss">✕</button>
+      <h2 className="card-title">Getting started</h2>
+      <ol>
+        <li className={hasLevels ? 'done' : ''}><a href="#/settings">Import your levels</a> so gear you can't equip yet gets flagged.</li>
+        <li className={hasGear ? 'done' : ''}>Mark the gear you <b>Own</b>, on <a href="#/rankings">Rankings</a> or a boss's page in <a href="#/content">Bosses &amp; Slayer</a>.</li>
+        <li>Check <a href="#/mine">My gear</a> for what to farm or buy next.</li>
+      </ol>
+    </div>
+  );
 }
 
 export function ReadinessBadge({ level }: { level: Readiness }) {

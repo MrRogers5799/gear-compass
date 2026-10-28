@@ -4,7 +4,7 @@ import { useUserData } from '../hooks/UserData';
 import { checkReqs } from '../lib/scoring';
 import { farmableSource } from '../lib/readiness';
 import { formatGp } from '../lib/wiki';
-import { Chips, ItemName, LockBadge, OwnWant, StyleBadge } from '../components/ui';
+import { Chips, GettingStarted, PageHeader, ItemName, LockBadge, OwnWant, StyleBadge } from '../components/ui';
 import type { Item, Slot } from '../types';
 
 const STYLES = ['all', 'melee', 'ranged', 'magic'] as const;
@@ -39,6 +39,8 @@ export function Rankings() {
 
   return (
     <section>
+      <PageHeader title="Gear rankings" subtitle="How often the wiki's strategy guides recommend each item, and how highly. Click any item for details." />
+      <GettingStarted />
       <div className="toolbar">
         <input type="search" placeholder="Search items…" value={q} onChange={e => setQ(e.target.value)} />
         <Chips options={STYLES} value={style} onChange={setStyle} />
@@ -47,7 +49,8 @@ export function Rankings() {
         <span className="label">Slot</span>
         <Chips options={SLOTS} value={slot} onChange={setSlot} />
       </div>
-      <div className="toolbar">
+      <div className="toolbar filters">
+        <span className="label">Show</span>
         <label className="check">
           <input type="checkbox" checked={user.hideLocked} onChange={e => update({ hideLocked: e.target.checked })} />
           Hide gear I can't equip yet
