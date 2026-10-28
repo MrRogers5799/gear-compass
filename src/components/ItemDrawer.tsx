@@ -3,7 +3,7 @@ import { useGear } from '../hooks/Gear';
 import { capitalize, formatGp, pageUrl } from '../lib/wiki';
 import { ItemIcon, LockBadge, OwnWant, SourceList, StyleBadge } from './ui';
 
-const CATEGORY_LABEL: Record<string, string> = { boss: 'Boss', raid: 'Raid', slayer: 'Slayer', wilderness: 'Wildy', minigame: 'Minigame' };
+const CATEGORY_LABEL: Record<string, string> = { boss: 'Boss', raid: 'Raid', slayer: 'Slayer', wilderness: 'Wildy', challenge: 'Challenge', minigame: 'Minigame' };
 
 export function ItemDrawer({ name, onClose }: { name: string | null; onClose: () => void }) {
   const { data, scores, price, iron } = useGear();

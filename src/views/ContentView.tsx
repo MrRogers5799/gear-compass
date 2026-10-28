@@ -8,9 +8,9 @@ import { READINESS_LABEL, setupReadiness, type Readiness } from '../lib/readines
 import { Chips, ItemIcon, PageHeader, ReadinessBadge } from '../components/ui';
 import type { Category, Slot } from '../types';
 
-const CATEGORIES = ['boss', 'raid', 'slayer', 'wilderness', 'minigame'] as const;
+const CATEGORIES = ['boss', 'raid', 'slayer', 'wilderness', 'challenge', 'minigame'] as const;
 export const CATEGORY_LABEL: Record<Category, string> = {
-  boss: 'Bosses', raid: 'Raids', slayer: 'Slayer', wilderness: 'Wilderness', minigame: 'Minigames',
+  boss: 'Bosses', raid: 'Raids', slayer: 'Slayer', wilderness: 'Wilderness', challenge: 'Challenges', minigame: 'Minigames',
 };
 const SLOT_ORDER: Slot[] = ['weapon', 'shield', 'head', 'body', 'legs', 'cape', 'neck', 'ammo', 'hands', 'feet', 'ring', 'special'];
 

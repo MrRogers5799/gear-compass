@@ -7,7 +7,7 @@ export type Slot =
 
 export type Style = 'melee' | 'ranged' | 'magic' | 'mixed';
 
-export type Category = 'boss' | 'raid' | 'slayer' | 'wilderness' | 'minigame';
+export type Category = 'boss' | 'raid' | 'slayer' | 'wilderness' | 'challenge' | 'minigame';
 
 export type Skill =
   | 'attack' | 'strength' | 'defence' | 'ranged'

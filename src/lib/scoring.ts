@@ -5,7 +5,7 @@ export const TIER_WEIGHT = [1, 0.6, 0.4, 0.25, 0.15];
 
 export type Weights = Record<Category, number>;
 
-export const DEFAULT_WEIGHTS: Weights = { boss: 1, raid: 0.5, slayer: 1, wilderness: 0.5, minigame: 0.5 };
+export const DEFAULT_WEIGHTS: Weights = { boss: 1, raid: 0.5, slayer: 1, wilderness: 0.5, challenge: 0.5, minigame: 0.5 };
 
 export interface Scored {
   item: Item;

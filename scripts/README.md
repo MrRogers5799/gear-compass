@@ -53,7 +53,7 @@ script uses it first. It only parses the clause between "requires" and
 
 1. Base page = the text before the first `/`. `Slayer task/X` pages become slayer content named X.
 2. Pages listed in `EXCLUDE_GROUPS` or matching `EXCLUDE_PATTERNS` are dropped: skilling activities, training and account guides, combat-achievement and speed-trial pages.
-3. `CATEGORY_OVERRIDES` sets the category directly (wilderness bosses, minigames such as the Inferno, Colosseum, Barrows, NMZ and BA). Otherwise the wiki categories decide: Raids → raid, Bosses + Wilderness → wilderness, Bosses → boss, Slayer monsters → slayer. Pages that match none of these are excluded.
+3. `CATEGORY_OVERRIDES` sets the category directly (wilderness bosses; Barrows and Moons of Peril as bosses; Fight Caves, Inferno and Colosseum as challenges; NMZ and BA as minigames). Otherwise the wiki categories decide: Raids → raid, Bosses + Wilderness → wilderness, Bosses → boss, Slayer monsters → slayer. Pages that match none of these are excluded.
 4. `ALIASES` merges pages that are the same content (for example `Aquanite/Strategies` and `Slayer task/Aquanites`). Raid sub-pages (CoX Challenge Mode, ToB Hard and Entry Mode) merge into their raid. The setup label gets the mode as a prefix, for example "Hard Mode: Melee".
 
 At the end of each run the script prints the included content by category,

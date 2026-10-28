@@ -2,7 +2,7 @@
 
 Pulls every {{Recommended equipment}} table from the wiki's Bucket store,
 groups the tables by piece of combat content (boss, raid, slayer task,
-wilderness, minigame), and enriches every recommended item with GE id,
+wilderness, challenge, minigame), and enriches every recommended item with GE id,
 image, members/tradeable flags, attack speed and equip requirements.
 
 Output matches the `GearData` contract in src/types.ts.
@@ -82,11 +82,12 @@ CATEGORY_OVERRIDES = {
     "Green dragon": "slayer", "Lava dragon": "slayer", "Krystilia": "slayer",
     "Metal dragons": "slayer", "Fossil Island Wyverns": "slayer",
     "Tormented Demon": "slayer", "Demonic gorilla": "slayer",
-    # minigames / challenge content
-    "Fortis Colosseum": "minigame", "Inferno": "minigame",
-    "TzHaar Fight Cave": "minigame", "Barrows": "minigame",
-    "Moons of Peril": "minigame", "Nightmare Zone": "minigame",
-    "Barbarian Assault": "minigame",
+    # chest bosses: several bosses, one loot chest
+    "Barrows": "boss", "Moons of Peril": "boss",
+    # solo wave-based PvM challenges
+    "Fortis Colosseum": "challenge", "Inferno": "challenge", "TzHaar Fight Cave": "challenge",
+    # true minigames
+    "Nightmare Zone": "minigame", "Barbarian Assault": "minigame",
     # bosses not (yet) in Category:Bosses
     "Demonic Brutus": "boss", "Mad Angel": "boss",
 }
@@ -1483,7 +1484,7 @@ def main(out_path):
             "best": dict(sorted(best_by_slot[n][slot].items())),
         }
 
-    order = ["raid", "boss", "wilderness", "slayer", "minigame"]
+    order = ["raid", "boss", "wilderness", "slayer", "challenge", "minigame"]
     ordered = sorted(contents.values(), key=lambda c: (order.index(c["category"]), c["name"].lower()))
 
     # ---- sources, slayer levels, quests ----------------------------------------
